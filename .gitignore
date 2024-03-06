@@ -1,0 +1,4 @@
+/.vs
+chess_server.vcxproj.filters
+chess_server.vcxproj.user
+errorLog.txt
