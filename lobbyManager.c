@@ -252,7 +252,7 @@ void __stdcall lobbyManagerThreadStart(void* arg)
     assert(!s_lobbyConnections);
     s_lobbyConnections = calloc(LOBBY_CAPACITY, sizeof(LobbyConnection));
 
-    InitializeCriticalSection(&g_lobbyMutex);//QUESTION ABOUT these IN STICKY NOTES
+    InitializeCriticalSection(&g_lobbyMutex);
     InitializeConditionVariable(&g_lobbyEmptyCond);
     InitializeConditionVariable(&g_gameManagerIsReadyCond);
     
@@ -266,8 +266,8 @@ void __stdcall lobbyManagerThreadStart(void* arg)
         EnterCriticalSection(&g_lobbyMutex);
         while(s_numOfLobbyConnections == 0)
         {
+            puts("The lobby is empty. Lobby thread is going to sleep");
             SleepConditionVariableCS(&g_lobbyEmptyCond, &g_lobbyMutex, INFINITE);
-            puts("lobby is empty. going back to sleep");
         }
 
         //capture only the current number of lobby connections. This way
@@ -290,7 +290,7 @@ void __stdcall lobbyManagerThreadStart(void* arg)
             //check if the lobby member's timer has reached PAIR_REQUEST_TIMEOUT_SECS
             checkForTimeout(s_lobbyConnections + i);
 
-                printf("%d\n", s_lobbyConnections[0].miliSecWaitingOnResoponse);
+            //printf("%d\n", s_lobbyConnections[0].miliSecWaitingOnResoponse);
 
             if(selectRet == SOCKET_ERROR) logError("select() failed with error: ", WSAGetLastError());
             else if(selectRet > 0)

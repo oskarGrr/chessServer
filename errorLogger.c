@@ -7,6 +7,17 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+//updated by calling getCurrentTime()
+static char timeBuff[64] = {0};
+
+const char* getCurrentTime()
+{
+    time_t t;
+    time(&t);
+    ctime_s(timeBuff, sizeof(timeBuff), &t);
+    return timeBuff;
+}
+
 //logs an error message and a corresponding error number if one is given. 
 void logError(char const* errMsg, int errorNumber)
 {
@@ -17,11 +28,6 @@ void logError(char const* errMsg, int errorNumber)
         FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM, NULL, 
             errorNumber, 0, errNumStr, sizeof(errNumStr), NULL); 
     }
-    
-    time_t t;
-    time(&t);
-    char timeBuff[64] = {0};
-    ctime_s(timeBuff, sizeof(timeBuff), &t);
 
     FILE* fileStream;
     errno_t err = fopen_s(&fileStream, "errorLog.txt", "a");
