@@ -257,7 +257,7 @@ void __stdcall lobbyManagerThreadStart(void* arg)
     InitializeConditionVariable(&g_gameManagerIsReadyCond);
     
     struct timespec tsStart, tsEnd, deltaTime;
-    TIMEVAL selectWaitTime = {.tv_usec = 20};
+    TIMEVAL selectWaitTime = {.tv_usec = 20};//20 microseconds
     fd_set readSockSet;
     FD_ZERO(&readSockSet);
 
@@ -284,17 +284,17 @@ void __stdcall lobbyManagerThreadStart(void* arg)
             FD_SET(s_lobbyConnections[i].socket, &readSockSet);
             int selectRet = select(0, &readSockSet, NULL, NULL, &selectWaitTime);
             
-            //if the lobby member is waiting on a PAIR_DECLINE_MSGTYPE or PAIR_ACCEPT_MSGTYPE add to their timer
+            //If the lobby member is waiting on a PAIR_DECLINE_MSGTYPE or PAIR_ACCEPT_MSGTYPE add to their timer.
             addTimeIfNecessary(s_lobbyConnections + i, &deltaTime);
             
-            //check if the lobby member's timer has reached PAIR_REQUEST_TIMEOUT_SECS
+            //Check if the lobby member's timer has reached PAIR_REQUEST_TIMEOUT_SECS.
             checkForTimeout(s_lobbyConnections + i);
 
             //printf("%d\n", s_lobbyConnections[0].miliSecWaitingOnResoponse);
 
             if(selectRet == SOCKET_ERROR) logError("select() failed with error: ", WSAGetLastError());
             else if(selectRet > 0)
-            {   
+            {
                 char buff[LOBBY_READ_BUFF_SIZE] = {0};
                 int recvRet = recv(s_lobbyConnections[i].socket, buff, LOBBY_READ_BUFF_SIZE, 0);
                 if(recvRet == 0)

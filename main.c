@@ -5,6 +5,7 @@
 //that is also connected to the server. After the two clients are paired messages 
 //are free to be transfered back and forth between players
 
+#include <stdio.h>
 #include <stdlib.h>
 #include "lobbyManager.h"
 #include "errorLogger.h"
@@ -12,9 +13,13 @@
 
 #include <winsock2.h>
 #include <process.h>
+#include <ConsoleApi.h>
 
 int main(void)
 {
+    BOOL WINAPI signalHandler(_In_ DWORD ctrlSignalType);
+    SetConsoleCtrlHandler(signalHandler, TRUE);
+
     WSADATA wsaData;
     if(WSAStartup(MAKEWORD(2,2), &wsaData))
     {
@@ -22,15 +27,43 @@ int main(void)
         return EXIT_FAILURE;
     }
     
+    //The thread responsible for listening to incomming TCP connection attempts.
+    //Once a connection is made, the lobby manager thread will be notified
+    //and woken up via a condition variable if it is asleep due to no one being on the server.
     HANDLE connectionAccepterThreadHandle = (HANDLE)_beginthread(
         acceptConnectionsThreadStart, ACCEPT_CONNECTIONS_STACKSIZE, NULL);
 
+    //The thread responsible for 
     HANDLE lobbyManagerThreadHandle = (HANDLE)_beginthread(
         lobbyManagerThreadStart, LOBBY_MANAGER_STACKSIZE, NULL);
 
-    //these will be waiting forever (for now the server keeps going until you press ctrl C)
+    //These will be waiting forever.
+    //For now the server keeps going until you press ctrl C or close the console.
     WaitForSingleObject(connectionAccepterThreadHandle, INFINITE);
     WaitForSingleObject(lobbyManagerThreadHandle, INFINITE);
     WSACleanup();
     return EXIT_SUCCESS;
+}
+
+BOOL WINAPI signalHandler(_In_ DWORD ctrlSignalType)
+{
+    switch(ctrlSignalType)
+    {
+    case CTRL_C_EVENT: 
+        puts("ctrl c event being handled..."); 
+        break; 
+    case CTRL_CLOSE_EVENT://the console was closed
+        break;
+    case CTRL_BREAK_EVENT:
+        puts("ctrl break/pause event being handled...");
+        break;
+
+    default:
+        return FALSE;//pass ctrlSignalType to the default handler
+    }
+
+    //TODO Send server shutdown message to client.
+
+    ExitProcess(ctrlSignalType);
+    return TRUE;
 }
