@@ -41,20 +41,26 @@ CONDITION_VARIABLE g_lobbyEmptyCond;
 CONDITION_VARIABLE g_gameManagerIsReadyCond;
 extern bool g_gameConstructionInProgress;//bool for lobby to wait on with the above CV
 
-//get how much room is left in the lobby. lock g_lobbyMutex before calling
-size_t getAvailableLobbyRoom()
+//get how much room is left in the lobby. 
+size_t getAvailableLobbyRoom(void)
 {
-    return LOBBY_CAPACITY - s_numOfLobbyConnections;
+    EnterCriticalSection(&g_lobbyMutex);
+    size_t availableLobbyRoom = LOBBY_CAPACITY - s_numOfLobbyConnections;
+    LeaveCriticalSection(&g_lobbyMutex);
+    return availableLobbyRoom;
 }
 
 //lock g_lobbyMutex before calling
-bool isLobbyEmpty()
+bool isLobbyEmpty(void)
 {
-    return s_numOfLobbyConnections == 0;
+    EnterCriticalSection(&g_lobbyMutex);
+    bool isTheLobbyEmpty = 0 == s_numOfLobbyConnections;
+    LeaveCriticalSection(&g_lobbyMutex);
+    return isTheLobbyEmpty;
 }
 
-static void connectionInfoCtor
-(LobbyConnection* const newConn, const int sock, struct sockaddr_in* addr)
+static void connectionInfoCtor(LobbyConnection* const newConn, 
+    const int sock, struct sockaddr_in* addr)
 {
     newConn->socket = sock;
     newConn->miliSecWaitingOnResoponse = -1;//-1 indicates that the user isnt waiting on a reponse
@@ -62,16 +68,20 @@ static void connectionInfoCtor
     InetNtopA(addr->sin_family, &addr->sin_addr, newConn->ipStr, INET6_ADDRSTRLEN);
 }
 
-//lock g_lobbyMutex before calling
 void lobbyInsert(const int socket, SOCKADDR_IN* addr)
 {
-    assert(s_lobbyConnections);
+    EnterCriticalSection(&g_lobbyMutex);
+
+    assert(s_lobbyConnections);//assert that the lobby thread has been initialized
     connectionInfoCtor(s_lobbyConnections + s_numOfLobbyConnections, socket, addr);
     ++s_numOfLobbyConnections;
+
+    LeaveCriticalSection(&g_lobbyMutex);
 }
 
 //also shrinks the lobby's range if necessary
-static void closeLobbyConnection(LobbyConnection* client, size_t* connectionRange, bool shouldCloseSock)
+static void closeLobbyConnection(LobbyConnection* client, 
+    size_t* connectionRange, bool shouldCloseSock)
 {
     EnterCriticalSection(&g_lobbyMutex);
 
@@ -80,7 +90,8 @@ static void closeLobbyConnection(LobbyConnection* client, size_t* connectionRang
     //if the client isnt at the end of the array, then just overwrite the client we are
     //closing with the client at the back of the array, otherwise just decrement the num of lobby connections
     LobbyConnection* clientAtBackOfArray = s_lobbyConnections + (s_numOfLobbyConnections - 1);
-    if(client != clientAtBackOfArray) memcpy(client, clientAtBackOfArray, sizeof(*client));
+    if(client != clientAtBackOfArray) 
+        memcpy(client, clientAtBackOfArray, sizeof(*client));
 
     --s_numOfLobbyConnections;
 
@@ -90,6 +101,7 @@ static void closeLobbyConnection(LobbyConnection* client, size_t* connectionRang
     LeaveCriticalSection(&g_lobbyMutex);
 }
 
+//TODO also check port numbers in case two people behind the same NAT router try to play
 static LobbyConnection* getClientByIP(uint32_t networkByteOrderIp)
 {
     //for now since I dont expect more than 2-10 people to be connected at one time,
@@ -115,6 +127,8 @@ static void sendLobbyMembersToGameManager(LobbyConnection* client1,
         chessGameThreadStart, GAME_MANAGER_STACKSIZE, newChessPair);
     
     EnterCriticalSection(&g_lobbyMutex);
+
+    //dont check for spurious wake (this is temporary)
     SleepConditionVariableCS(&g_gameManagerIsReadyCond, &g_lobbyMutex, INFINITE);
 
     //now that we are awake (the game thread has started and has coppied newChessPair)
@@ -181,10 +195,10 @@ static void handlePairRequest(const char* msg, LobbyConnection* client)
 }
 
 //close connection and return false if msg size doesnt match the type
-static bool
-confirmMsgSize(size_t msgSize, size_t correctSize, LobbyConnection* client)
+static bool confirmMsgSize(size_t msgSize, size_t correctSize, LobbyConnection* client)
 {
-    if(msgSize == correctSize) return true;
+    if(msgSize == correctSize) 
+        return true;
     
     logError("wrong message size for the given type sent from the client uh oh", 0);
     return false;
@@ -221,7 +235,7 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
 
 //if the lobby member has sent a PAIR_REQUEST_MSGTYPE and is waiting PAIR_REQUEST_TIMEOUT_SECS
 //for either a PAIR_DECLINE_MSGTYPE or a PAIR_ACCEPT_MSGTYPE then add time to their personal timer
-static void addTimeIfNecessary(LobbyConnection* lobbyConn, struct timespec* deltaTime)
+static void addTimeIfNecessary(LobbyConnection* lobbyConn, const struct timespec* deltaTime)
 {
     //miliSecWaitingOnRequestResoponse will be -1 if they are not waiting
     if(lobbyConn->miliSecWaitingOnResoponse < 0)
@@ -269,7 +283,7 @@ void __stdcall lobbyManagerThreadStart(void* arg)
             puts("The lobby is empty. Lobby thread is going to sleep");
             SleepConditionVariableCS(&g_lobbyEmptyCond, &g_lobbyMutex, INFINITE);
         }
-
+        
         //capture only the current number of lobby connections. This way
         //the loop below will only work with the lobby members currently connected and not ones
         //that might be inserted while the below loop is doing its thing

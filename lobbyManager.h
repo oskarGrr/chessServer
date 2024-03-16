@@ -24,13 +24,12 @@ typedef struct
 //which will manage the "lobby" connections.
 void __stdcall lobbyManagerThreadStart(void*);
 
-//insert a new connected client into the "lobby". the lobby manager thread has to have started first.
-//lock g_lobbyMutex first.
+//insert a new connected client into the lobby. 
 void lobbyInsert(const int socketFd, SOCKADDR_IN* addr);
 
-//get how much room is left in the lobby
-size_t getAvailableLobbyRoom();
+//Get how much room is left in the lobby. 
+size_t getAvailableLobbyRoom(void);
 
-bool isLobbyEmpty();
+bool isLobbyEmpty(void);
 
 #endif //LOBBY_MANAGER_H

@@ -76,7 +76,7 @@ void printConnection(SOCKADDR_IN* addr)
 {
     char buff[INET6_ADDRSTRLEN] = {0};
     InetNtopA(AF_INET, &addr->sin_addr, buff, sizeof(buff));
-    printf("%s connected\n", buff);
+    printf("%s:%hu connected\n", buff, addr->sin_port);
 }
 
 static void acceptNewConnections(SOCKET listenSocket)
@@ -105,11 +105,9 @@ static void acceptNewConnections(SOCKET listenSocket)
         }
         else
         {
-            EnterCriticalSection(&g_lobbyMutex);
             bool lobbyWasEmpty = isLobbyEmpty();
             lobbyInsert(socketFd, &addrInfo);
-            LeaveCriticalSection(&g_lobbyMutex);
-            if(lobbyWasEmpty) 
+            if(lobbyWasEmpty)
             {
                 puts("waking the lobby up\n");
                 WakeConditionVariable(&g_lobbyEmptyCond);
