@@ -45,9 +45,9 @@ int main(void)
     return EXIT_SUCCESS;
 }
 
-BOOL WINAPI signalHandler(_In_ DWORD ctrlSignalType)
+BOOL WINAPI signalHandler(_In_ DWORD signalType)
 {
-    switch(ctrlSignalType)
+    switch(signalType)
     {
     case CTRL_C_EVENT: 
         puts("ctrl c event being handled..."); 
@@ -64,6 +64,6 @@ BOOL WINAPI signalHandler(_In_ DWORD ctrlSignalType)
 
     //TODO Send server shutdown message to client.
 
-    ExitProcess(ctrlSignalType);
+    ExitProcess(signalType);
     return TRUE;
 }
