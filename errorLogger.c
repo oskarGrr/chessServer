@@ -31,23 +31,26 @@ void logError(char const* errMsg, int errorNumber)
 
     FILE* fileStream;
     errno_t err = fopen_s(&fileStream, "errorLog.txt", "a");
+
+    const char* timeStr = getCurrentTime();
+
     if(err)
     {
         fprintf(stderr, "error trying to open errorLog.txt\nerror message that would have been logged: ");
-        if(errNumStr) fprintf(stderr, "%s (%s) at %s", errMsg, errNumStr, timeBuff);
-        else fprintf(stderr, "%s at ", timeBuff);
+        if(errNumStr) fprintf(stderr, "%s (%s) at %s", errMsg, errNumStr, timeStr);
+        else fprintf(stderr, "%s at ", timeStr);
     }
     else
     {
         if(errorNumber != 0)
         {
             fprintf(fileStream, "\n\n%s errnum=%d %s at %s\n\n", 
-                errMsg, errorNumber, errNumStr, timeBuff);
+                errMsg, errorNumber, errNumStr, timeStr);
         }
         else 
         {
             fprintf(fileStream, "\n\n%s errnum=%d at %s\n\n", 
-                errMsg, errorNumber, timeBuff);
+                errMsg, errorNumber, timeStr);
         }
 
         fclose(fileStream);
