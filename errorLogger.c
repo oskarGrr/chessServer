@@ -18,7 +18,8 @@ const char* getCurrentTime()
     return timeBuff;
 }
 
-//logs an error message and a corresponding error number if one is given. 
+//logs an error message and a corresponding error number if the error number is not 0.
+//also prints the error message and number to stderr.
 void logError(char const* errMsg, int errorNumber)
 {
     char errNumStr[256] = {0};
@@ -44,13 +45,15 @@ void logError(char const* errMsg, int errorNumber)
     {
         if(errorNumber != 0)
         {
-            fprintf(fileStream, "\n\n%s errnum=%d %s at %s\n\n", 
-                errMsg, errorNumber, errNumStr, timeStr);
+            const char* formatStr = "\n\n%s errnum=%d %s at %s\n\n";
+            fprintf(fileStream, formatStr, errMsg, errorNumber, errNumStr, timeStr);
+            fprintf(stderr, formatStr, errMsg, errorNumber, errNumStr, timeStr);
         }
         else 
         {
-            fprintf(fileStream, "\n\n%s errnum=%d at %s\n\n", 
-                errMsg, errorNumber, timeStr);
+            const char* formatStr = "\n\n%s at %s";
+            fprintf(fileStream, formatStr, errMsg, timeStr);
+            fprintf(stderr, formatStr, errMsg, timeStr);
         }
 
         fclose(fileStream);
