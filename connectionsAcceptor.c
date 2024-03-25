@@ -76,7 +76,8 @@ void printConnection(SOCKADDR_IN* addr)
 {
     char buff[INET6_ADDRSTRLEN] = {0};
     InetNtopA(AF_INET, &addr->sin_addr, buff, sizeof(buff));
-    printf("%s:%hu connected\n", buff, addr->sin_port);
+    const char* currentTime = getCurrentTime();
+    printf("%s:%hu connected\nat %s\n\n", buff, addr->sin_port, currentTime);
 }
 
 static void acceptNewConnections(SOCKET listenSocket)
