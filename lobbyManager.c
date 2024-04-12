@@ -59,6 +59,7 @@ bool isLobbyEmpty(void)
     return isTheLobbyEmpty;
 }
 
+//This function is called after g_lobbyMutex is locked.
 static void connectionInfoCtor(LobbyConnection* const newConn, 
     const int sock, struct sockaddr_in* addr)
 {
@@ -66,6 +67,30 @@ static void connectionInfoCtor(LobbyConnection* const newConn,
     newConn->miliSecWaitingOnResoponse = -1;//-1 indicates that the user isnt waiting on a reponse
     memcpy(&newConn->addr, addr, sizeof(*addr));
     InetNtopA(addr->sin_family, &addr->sin_addr, newConn->ipStr, INET6_ADDRSTRLEN);
+
+    uint32_t newID = (uint32_t)rand();
+
+    //Check to make sure the new ID is unique. For now just does a linear search over every connection.
+    //This is fine because I dont plan on more than a few people ever being in the server at 1 time.
+    //In the future maybe I will make some type of self balancing bin search tree like a red black tree
+    //to store the connections so that this search will be log2(n).
+    for(int i = 0; i < s_numOfLobbyConnections; ++i)
+    {
+        //Make sure the new ID has not been taken yet.
+        if(newID == s_lobbyConnections[i].uniqueID)
+        {
+            newID = (uint32_t)rand();
+            i = -1;//restart the loop
+        }
+    }
+
+    newConn->uniqueID = newID;
+
+    //send the randomly generated ID to the client so they can use it effectively as a "friend code"
+    char newIDMessage[NEW_ID_MSG_SIZE] = {NEW_ID_MSGTYPE};
+    uint32_t nwByteOrder_ID = (uint32_t)htonl(newID);
+    memcpy(newIDMessage + 1, &nwByteOrder_ID, sizeof(nwByteOrder_ID));
+    send(sock, newIDMessage, sizeof(newIDMessage), 0);
 }
 
 void lobbyInsert(const int socket, SOCKADDR_IN* addr)
@@ -90,7 +115,7 @@ static void closeLobbyConnection(LobbyConnection* client,
     //if the client isnt at the end of the array, then just overwrite the client we are
     //closing with the client at the back of the array, otherwise just decrement the num of lobby connections
     LobbyConnection* clientAtBackOfArray = s_lobbyConnections + (s_numOfLobbyConnections - 1);
-    if(client != clientAtBackOfArray) 
+    if(client != clientAtBackOfArray)
         memcpy(client, clientAtBackOfArray, sizeof(*client));
 
     --s_numOfLobbyConnections;
@@ -101,19 +126,22 @@ static void closeLobbyConnection(LobbyConnection* client,
     LeaveCriticalSection(&g_lobbyMutex);
 }
 
-//TODO also check port numbers in case two people behind the same NAT router try to play
-static LobbyConnection* getClientByIP(uint32_t networkByteOrderIp)
+//Gets a client from their "friend code" (unique identifier). 
+//If no one is connected with uniqueID returns null pointer.
+static LobbyConnection* getClientByUniqueID(const uint32_t hostByteOrderUniqueID)
 {
-    //for now since I dont expect more than 2-10 people to be connected at one time,
+    //For now since I dont expect more than 2-10 people to be connected at one time,
     //I am just going to loop over every person connected to search for them.
-    //in the future I will make some kind of hash function to have O(1) lookups in a table        
+    //in the future I will make some kind of hash function to have O(1) 
+    //lookups in a hash table that associates the client's unique ID with where they are in memory.
     for(int i = 0; i < s_numOfLobbyConnections; ++i)
     {
-        //if the requested IP is connected to the server
-        if(networkByteOrderIp == s_lobbyConnections[i].addr.sin_addr.s_addr)
+        //if the requested ID is connected to the server
+        if(hostByteOrderUniqueID == s_lobbyConnections[i].uniqueID)
             return s_lobbyConnections + i;
     }
     
+    //return null pointer signifying that no one with networkByteOrderUniqueID is connected to the server.
     return NULL;
 }
 
@@ -140,17 +168,22 @@ static void sendLobbyMembersToGameManager(LobbyConnection* client1,
     LeaveCriticalSection(&g_lobbyMutex);
 }
 
+//Handles the PAIR_ACCEPT_MSGTYPE message type (defined in chessAppLevelProtocol.h).
 static void handlePairAccept(const char* msg, LobbyConnection* client, size_t* currentRange)
 {
-    uint32_t networkByteOrderIp = 0;
-    memcpy(&networkByteOrderIp, msg + 1, sizeof(networkByteOrderIp));
+    uint32_t networkByteOrderUniqueID = 0;
 
-    LobbyConnection* opponent = getClientByIP(networkByteOrderIp);
-    if(!opponent)//if the person who originally sent the request is no longer in the lobby
+    //The first byte of every message will be a 1 byte char that is the corresponding
+    //macro defined in chessAppLevelProtocol.h to signify what the following bytes represent.
+    //This is why the src in memcpy is msg + 1, since we are "stepping over" that 1 byte message header.
+    memcpy(&networkByteOrderUniqueID, msg + 1, sizeof(networkByteOrderUniqueID));
+
+    LobbyConnection* opponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
+    if(!opponent)//if the person who originally sent PAIR_REQUEST_MSGTYPE is no longer in the lobby
     {
-        char buff[IP_NOT_IN_LOBBY_MSG_SIZE] = {IP_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
         send(client->socket, buff, sizeof(buff), 0);
-        printf("sending IP_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
+        printf("sending ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
     }
     else
     {
@@ -158,10 +191,18 @@ static void handlePairAccept(const char* msg, LobbyConnection* client, size_t* c
     }
 }
 
+//Handles the PAIR_REQUEST_MSGTYPE message type (defined in chessAppLevelProtocol.h)
 static void handlePairRequest(const char* msg, LobbyConnection* client)
-{   
-    uint32_t nwByteOrderIpOpponent = 0;//the IP of the requested opponent
-    memcpy(&nwByteOrderIpOpponent, msg + 1, sizeof(nwByteOrderIpOpponent));
+{
+    //This number comes in as network byte order, and stays as network byte order.
+    //This is because uniqueIdentifier will be re-sent immediately to the client
+    //of the person that client(the client param) anyway.
+    uint32_t networkByteOrderUniqueID = 0;
+
+    //The first byte of every message will be a 1 byte char that is the corresponding
+    //macro defined in chessAppLevelProtocol.h to signify what the following bytes represent.
+    //This is why the src in memcpy is msg + 1, since we are "stepping over" that 1 byte message header.
+    memcpy(&networkByteOrderUniqueID, msg + 1, sizeof(networkByteOrderUniqueID));
     
     //if already waiting on a response to a pair request message then stop
     //the client from making another request before their timer resets
@@ -173,12 +214,12 @@ static void handlePairRequest(const char* msg, LobbyConnection* client)
         return;
     }
 
-    LobbyConnection* potentialOpponent = getClientByIP(nwByteOrderIpOpponent);
+    LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
     if(!potentialOpponent || potentialOpponent == client)
     {
-        char buff[IP_NOT_IN_LOBBY_MSG_SIZE] = {IP_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
         send(client->socket, buff, sizeof(buff), 0);
-        printf("sending IP_NOT_IN_LOBBY_MSGTYPE tp %s\n", client->ipStr);
+        printf("sending ID_NOT_IN_LOBBY_MSGTYPE tp %s\n", client->ipStr);
     }
     else
     {
@@ -204,7 +245,9 @@ static bool confirmMsgSize(size_t msgSize, size_t correctSize, LobbyConnection* 
     return false;
 }
 
-//return false if client was disconnected
+//return false if client was disconnected. This function will not swap byte ordering
+//(if necessary) from network to host byte order. That will be handled inside of the corresponding
+//handleThisTypeOfMessage(const char* message) function.
 static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     LobbyConnection* client, size_t* currentRange)
 {
@@ -269,7 +312,7 @@ void __stdcall lobbyManagerThreadStart(void* arg)
     InitializeCriticalSection(&g_lobbyMutex);
     InitializeConditionVariable(&g_lobbyEmptyCond);
     InitializeConditionVariable(&g_gameManagerIsReadyCond);
-    
+
     struct timespec tsStart, tsEnd, deltaTime;
     TIMEVAL selectWaitTime = {.tv_usec = 20};//20 microseconds
     fd_set readSockSet;

@@ -12,6 +12,7 @@ typedef struct
     struct sockaddr_in addr;
     char ipStr[INET6_ADDRSTRLEN];
     int32_t miliSecWaitingOnResoponse;//-1 if not waiting
+    uint32_t uniqueID;//stored in host byte order
 }LobbyConnection;
 
 //the size of the stack used by the lobby manager thread in bytes

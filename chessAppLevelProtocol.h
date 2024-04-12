@@ -58,15 +58,16 @@ Side {INVALID = 0, WHITE, BLACK} Side;
 #define PAIRING_COMPLETE_MSGTYPE 8
 #define PAIRING_COMPLETE_MSG_SIZE 2
 
-//sent to request to be paired up with an opponent.
-//the 4 bytes after the PAIR_REQUEST_MSGTYPE will be the ip address
-//of the opponent that the client would like to pair and play chess with
+//Sent in order to (client to server and server to client)
+//request to pair up and play chess with a potential opponent.
+//The 4 bytes after the PAIR_REQUEST_MSGTYPE will be the network byte order 
+//uint32_t unique identifier (kind of like a friend code).
 #define PAIR_REQUEST_MSGTYPE 9
 #define PAIR_REQUEST_MSG_SIZE 5
 
-//when the opponent accepts a request to be paired up.
-//the 4 bytes after the PAIR_REQUEST_MSGTYPE will be the ip address
-//of the player that origonally requested to be paired up with the PAIR_REQUEST_MSGTYPE msg
+//When the opponent accepts a PAIR_REQUEST_MSGTYPE.
+//The 4 bytes after the PAIR_ACCEPT_MSGTYPE will be the network byte order uint32_t unique identifier
+//of the player that originally requested to be paired up with the PAIR_REQUEST_MSGTYPE message.
 #define PAIR_ACCEPT_MSGTYPE 10
 #define PAIR_ACCEPT_MSG_SIZE 5
 
@@ -86,9 +87,9 @@ Side {INVALID = 0, WHITE, BLACK} Side;
 #define SERVER_FULL_MSG_SIZE 1
 
 //when you try to request to play chess 
-//with an ip that isnt in the lobby or if you request your own ip
-#define IP_NOT_IN_LOBBY_MSGTYPE 14
-#define IP_NOT_IN_LOBBY_MSG_SIZE 1
+//with an player that isnt in the lobby or if you request yourself.
+#define ID_NOT_IN_LOBBY_MSGTYPE 14
+#define ID_NOT_IN_LOBBY_MSG_SIZE 1
 
 //sent when wanting to disconnect from the
 //opponent, but not necessarily the server
@@ -106,5 +107,12 @@ Side {INVALID = 0, WHITE, BLACK} Side;
 //when the client tries to make a pair request 
 #define PAIR_REQUEST_TOO_SOON_MSGTYPE 18
 #define PAIR_REQUEST_TOO_SOON_MSG_SIZE 1
+
+//sends a 4 byte unsigned network byte order integer from the server to the client which represents
+//their unique identifier on the server. It is effectively their "friend code"
+//for pairing up with other players. The first byte will be the NEW_ID_MSGTYPE 
+//as a char just like the other messages.
+#define NEW_ID_MSGTYPE 19
+#define NEW_ID_MSG_SIZE 5
 
 #endif //CHESSAPPLEVEL_PROTOCOL_H
