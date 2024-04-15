@@ -116,6 +116,9 @@ static bool recvAndHandleMsg(ChessPlayer* from, ChessPlayer* to,
 //this means they will be isolated from other game manager threads/lobby thread etc
 void __stdcall chessGameThreadStart(void* incommingLobbyConnections)
 {
+    //rand() needs to be seeded per thread.
+    srand(time(NULL));
+
     //incommingLobbyConnections will point to an array of two LobbyConnection pointers
     //where the first pointer will point to player1, and the second will point to player 2.
     LobbyConnection** lobbyConnections = incommingLobbyConnections;
@@ -143,7 +146,7 @@ void __stdcall chessGameThreadStart(void* incommingLobbyConnections)
     {
         srand((unsigned)time(NULL));
         char buff[PAIRING_COMPLETE_MSG_SIZE] = {PAIRING_COMPLETE_MSGTYPE};
-        Side whiteOrBlackPieces = (rand() & 1) ? WHITE : BLACK;
+        char whiteOrBlackPieces = (rand() & 1) ? (char)WHITE : (char)BLACK;
 
         player1.side = whiteOrBlackPieces;
         memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
