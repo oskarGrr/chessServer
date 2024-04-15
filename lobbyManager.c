@@ -223,8 +223,10 @@ static void handlePairRequest(const char* msg, LobbyConnection* client)
     }
     else
     {
+        uint32_t nwByteOrderClientID = htonl(client->uniqueID);
         char buff[PAIR_REQUEST_MSG_SIZE] = {PAIR_REQUEST_MSGTYPE};
-        memcpy(buff + 1, &networkByteOrderUniqueID, sizeof(buff) - 1);
+        memcpy(buff + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
+
         send(potentialOpponent->socket, buff, sizeof(buff), 0);
         printf("sending PAIR_REQUEST_MSGTYPE to %s\n", potentialOpponent->ipStr);
 
