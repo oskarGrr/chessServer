@@ -13,103 +13,111 @@ extern CRITICAL_SECTION   g_lobbyMutex;
 extern CONDITION_VARIABLE g_gameManagerIsReadyCond;
 extern CONDITION_VARIABLE g_lobbyEmptyCond;
 
+#define STRINGIFY(x) #x
+
 typedef struct
 {
     SOCKET sock;
     Side side;
     SOCKADDR_IN addr;
+    char ipStr[INET6_ADDRSTRLEN];
 }ChessPlayer;
 
-static void putPlayersBackAndEndThread(ChessPlayer* p1, ChessPlayer* p2, 
-    const char* p1IpStr, const char* p2IpStr)
+static void putPlayersBackAndEndThread(ChessPlayer* p1, ChessPlayer* p2)
 {
-    EnterCriticalSection(&g_lobbyMutex);
-    bool lobbyWasEmpty = isLobbyEmpty();
-    if(p1) 
+    const bool lobbyWasEmpty = isLobbyEmpty();
+
+    if(p1)
     {
         lobbyInsert(p1->sock, &p1->addr);
-        printf("putting %s back in the lobby\n", p1IpStr);
+        printf("putting %s back in the lobby\n", p1->ipStr);
     }
-    if(p2) lobbyInsert(p2->sock, &p2->addr);
-    if(lobbyWasEmpty) 
+    if(p2)
     {
-        WakeConditionVariable(&g_lobbyEmptyCond);
-        printf("putting %s back in the lobby\n", p2IpStr);
+        lobbyInsert(p2->sock, &p2->addr);
+        printf("putting %s back in the lobby\n", p2->ipStr);
     }
-    LeaveCriticalSection(&g_lobbyMutex);
+
+    if(lobbyWasEmpty) 
+        WakeConditionVariable(&g_lobbyEmptyCond);
+
     _endthread();
 }
 
-static bool recvAndHandleMsg(ChessPlayer* from, ChessPlayer* to, 
-    const char* fromIpStr, const char *toIpStr)
+static void forwardMessage(const char* msg, size_t msgSize, const char* msgType, 
+    const ChessPlayer* from, const ChessPlayer* to)
 {
-    char recvBuff[64] = {0};
-    int recvRet = recv(from->sock, recvBuff, sizeof(recvBuff), 0);
+    printf("forwarding a %s message from %s to %s\n", msgType, from->ipStr, to->ipStr);
+    send(to->sock, msg, msgSize, 0);
+}
+
+static const char* recvMessage(ChessPlayer* from, ChessPlayer* to, char* msgBuff, size_t buffSize)
+{
+    int recvRet = recv(from->sock, msgBuff, sizeof(buffSize), 0);
     if(recvRet == SOCKET_ERROR)
     {
         char errMsg[256] = {0};
         snprintf(errMsg, sizeof(errMsg), "recv failed in a game between %s and %s",
-            fromIpStr, toIpStr);
+            from->ipStr, to->ipStr);
         logError(errMsg, WSAGetLastError());
-        putPlayersBackAndEndThread(from, to, fromIpStr, toIpStr);
+        putPlayersBackAndEndThread(from, to);
     }
     if(recvRet == 0)
     {
+        char msgTypeStr[] = STRINGIFY(OPPONENT_CLOSED_CONNECTION_MSGTPYE);
         char buff[OPPONENT_CLOSED_CONNECTION_MSG_SIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTPYE};
         send(to->sock, buff, sizeof(buff), 0);
-        printf("connection from %s closed, sending OPPONENT_CLOSED_CONNECTION_MSGTPYE to %s\n", 
-            fromIpStr, toIpStr);
+        printf("connection from %s closed. Sending %s to %s\n", from->ipStr, msgTypeStr, to->ipStr);
         closesocket(from->sock);
-        putPlayersBackAndEndThread(NULL, to, fromIpStr, toIpStr);
+        putPlayersBackAndEndThread(NULL, to);
     }
-    
-    switch(recvBuff[0])
+}
+
+static void handleInvalidMessageType(ChessPlayer* from, ChessPlayer* to)
+{
+    const char formatStr[] = "invalid message type sent from %s in a game against %s... uh oh";
+    char errMsgBuff[256] = {0};
+    sprintf_s(errMsgBuff, sizeof(errMsgBuff), formatStr, from->ipStr, to->ipStr);
+    logError(errMsgBuff, 0);
+    closesocket(from->sock);
+    putPlayersBackAndEndThread(NULL, to);
+}
+
+static void handleMessage(const char* msg, ChessPlayer* from, ChessPlayer* to)
+{
+    switch(msg[0])
     {
-    case UNPAIR_MSGTPYE:
-    {
-        send(to->sock, recvBuff, UNPAIR_MSG_SIZE, 0);
-        printf("forwarding UNPAIR_MSGTPYE from %s to %s\n", fromIpStr, toIpStr);
-        putPlayersBackAndEndThread(from, to, fromIpStr, toIpStr);
-        break;
-    }
-    case MOVE_MSGTYPE:
-    {
-        send(to->sock, recvBuff, MOVE_MSG_SIZE, 0);
-        printf("forwarding a MOVE_MSGTYPE from %s to %s\n", fromIpStr, toIpStr);
-        break;
-    }
-    case RESIGN_MSGTYPE:
-    {
-        send(to->sock, recvBuff, RESIGN_MSG_SIZE, 0);
-        printf("forwarding a RESIGN_MSGTYPE from %s to %s\n", fromIpStr, toIpStr);
-        //dont put players back in the lobby yet, because they could still rematch
-        break;
-    }
-    case REMATCH_REQUEST_MSGTYPE:
-    {
-        send(to->sock, recvBuff, REMATCH_REQUEST_MSG_SIZE, 0);
-        printf("forwarding a REMATCH_REQUEST_MSGTYPE from %s to %s\n", fromIpStr, toIpStr);
-        break;
-    }
-    case REMATCH_ACCEPT_MSGTYPE:
-    {
-        send(to->sock, recvBuff, REMATCH_ACCEPT_MSG_SIZE, 0);
-        printf("forwarding a REMATCH_ACCEPT_MSGTYPE from %s to %s\n", fromIpStr, toIpStr);
-        break;
-    }
-    case REMATCH_DECLINE_MSGTYPE:
-    {
-        send(to->sock, recvBuff, REMATCH_DECLINE_MSG_SIZE, 0);
-        printf("forwarding a REMATCH_DECLINE_MSGTYPE from %s to %s\n", fromIpStr, toIpStr);
-        putPlayersBackAndEndThread(from, to, fromIpStr, toIpStr);
-        break;
-    }
-    default:
-        logError("invalid message type sent uh oh", 0);
-        return false;
+    case UNPAIR_MSGTPYE: {forwardMessage(msg, UNPAIR_MSG_SIZE, STRINGIFY(UNPAIR_MSGTPYE), from, to); break;}
+    case MOVE_MSGTYPE: {forwardMessage(msg, MOVE_MSG_SIZE, STRINGIFY(MOVE_MSGTYPE), from, to); break;}
+    case RESIGN_MSGTYPE: {forwardMessage(msg, RESIGN_MSG_SIZE, STRINGIFY(RESIGN_MSGTYPE), from, to); break;}
+    case REMATCH_REQUEST_MSGTYPE: {forwardMessage(msg, REMATCH_REQUEST_MSG_SIZE, STRINGIFY(REMATCH_REQUEST_MSGTYPE), from, to); break;}
+    case REMATCH_ACCEPT_MSGTYPE: {forwardMessage(msg, REMATCH_ACCEPT_MSG_SIZE, STRINGIFY(REMATCH_ACCEPT_MSGTYPE), from, to); break;}
+    case REMATCH_DECLINE_MSGTYPE: {forwardMessage(msg, REMATCH_DECLINE_MSG_SIZE, STRINGIFY(REMATCH_DECLINE_MSGTYPE), from, to); break;}
+    case DRAW_ACCEPT_MSGTYPE: {forwardMessage(msg, DRAW_ACCEPT_MSG_SIZE, STRINGIFY(DRAW_ACCEPT_MSG_SIZE), from, to); break;}
+    case DRAW_OFFER_MSGTYPE: {forwardMessage(msg, DRAW_OFFER_MSG_SIZE, STRINGIFY(DRAW_OFFER_MSGTYPE), from, to); break;}
+    case DRAW_DECLINE_MSGTYPE: {forwardMessage(msg, DRAW_DECLINE_MSG_SIZE, STRINGIFY(DRAW_DECLINE_MSGTYPE), from, to); break;}
+    default: {handleInvalidMessageType(from, to);}
     }
 
-    return true;
+    if(msg[0] == UNPAIR_MSGTPYE || msg[0] == REMATCH_DECLINE_MSGTYPE)
+        putPlayersBackAndEndThread(from, to);
+}
+
+static void sendPairingCompleteMsg(ChessPlayer* p1, ChessPlayer* p2)
+{
+    char buff[PAIRING_COMPLETE_MSG_SIZE] = {PAIRING_COMPLETE_MSGTYPE};
+    char whiteOrBlackPieces = (rand() & 1) ? (char)WHITE : (char)BLACK;
+
+    p1->side = whiteOrBlackPieces;
+    memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
+    send(p1->sock, buff, sizeof(buff), 0);
+
+    whiteOrBlackPieces = (whiteOrBlackPieces == WHITE) ? BLACK : WHITE;//swap sides
+
+    p2->side = whiteOrBlackPieces;
+    memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
+    send(p2->sock, buff, sizeof(buff), 0);
+    printf("sending PAIRING_COMPLETE_MSG to %s and %s\n", p1->ipStr, p2->ipStr);
 }
 
 //The lobby connections will be coppied into the stack for this thread.
@@ -117,7 +125,7 @@ static bool recvAndHandleMsg(ChessPlayer* from, ChessPlayer* to,
 void __stdcall chessGameThreadStart(void* incommingLobbyConnections)
 {
     //rand() needs to be seeded per thread.
-    srand(time(NULL));
+    srand((unsigned)time(NULL));
 
     //incommingLobbyConnections will point to an array of two LobbyConnection pointers
     //where the first pointer will point to player1, and the second will point to player 2.
@@ -142,28 +150,10 @@ void __stdcall chessGameThreadStart(void* incommingLobbyConnections)
 
     WakeConditionVariable(&g_gameManagerIsReadyCond);
     
-    //Send the informantion that the pairing process is complete and which color pieces to play as.
-    {
-        srand((unsigned)time(NULL));
-        char buff[PAIRING_COMPLETE_MSG_SIZE] = {PAIRING_COMPLETE_MSGTYPE};
-        char whiteOrBlackPieces = (rand() & 1) ? (char)WHITE : (char)BLACK;
+    InetNtopA(player1.addr.sin_family, &player1.addr.sin_addr, player1.ipStr, sizeof(player1.ipStr));
+    InetNtopA(player2.addr.sin_family, &player2.addr.sin_addr, player2.ipStr, sizeof(player2.ipStr));
 
-        player1.side = whiteOrBlackPieces;
-        memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
-        send(player1.sock, buff, sizeof(buff), 0);
-
-        whiteOrBlackPieces = (whiteOrBlackPieces == WHITE) ? BLACK : WHITE;//swap sides
-
-        player2.side = whiteOrBlackPieces;
-        memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
-        send(player2.sock, buff, sizeof(buff), 0);
-    }
-    
-    char player1IPStr[INET6_ADDRSTRLEN] = {0};
-    char player2IPStr[INET6_ADDRSTRLEN] = {0};
-    InetNtopA(player1.addr.sin_family, &player1.addr.sin_addr, player1IPStr, sizeof(player1IPStr));
-    InetNtopA(player2.addr.sin_family, &player2.addr.sin_addr, player2IPStr, sizeof(player2IPStr));
-    printf("sending PAIRING_COMPLETE_MSG to %s and %s\n", player1IPStr, player2IPStr);
+    sendPairingCompleteMsg(&player1, &player2);
 
     TIMEVAL tv = {.tv_usec = 10};
     fd_set readSet;
@@ -179,17 +169,25 @@ void __stdcall chessGameThreadStart(void* incommingLobbyConnections)
         {
             char errMsg[256];
             snprintf(errMsg, sizeof(errMsg), "select failed in a game between %s and %s",
-                player1IPStr, player2IPStr);
+                player1.ipStr, player2.ipStr);
             logError(errMsg, WSAGetLastError());
-            putPlayersBackAndEndThread(&player1, &player2, player1IPStr, player2IPStr);
+            putPlayersBackAndEndThread(&player1, &player2);
             _endthread();
         }
         else if(selectRet > 0)
         {
             if(FD_ISSET(player1.sock, &readSet))
-                recvAndHandleMsg(&player1, &player2, player1IPStr, player2IPStr);
+            {
+                char messageBuff[128] = {0};
+                recvMessage(&player1, &player2, messageBuff, sizeof(messageBuff));
+                handleMessage(messageBuff, &player1, &player2);
+            }
             if(FD_ISSET(player2.sock, &readSet))
-                recvAndHandleMsg(&player2, &player1, player2IPStr, player1IPStr);
+            {
+                char messageBuff[128] = {0};
+                recvMessage(&player2, &player1, messageBuff, sizeof(messageBuff));
+                handleMessage(messageBuff, &player2, &player1);
+            }
         }
     }
 }
