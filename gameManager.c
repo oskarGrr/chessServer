@@ -39,8 +39,10 @@ static void putPlayersBackAndEndThread(ChessPlayer* p1, ChessPlayer* p2)
     }
 
     if(lobbyWasEmpty) 
+    {
+        puts("waking the lobby thread up");
         WakeConditionVariable(&g_lobbyEmptyCond);
-
+    }
     _endthread();
 }
 

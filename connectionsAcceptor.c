@@ -110,7 +110,7 @@ static void acceptNewConnections(SOCKET listenSocket)
             lobbyInsert(socketFd, &addrInfo);
             if(lobbyWasEmpty)
             {
-                puts("waking the lobby up\n");
+                puts("waking the lobby thread up");
                 WakeConditionVariable(&g_lobbyEmptyCond);
             }
         }

@@ -11,8 +11,20 @@ typedef struct
     SOCKET socket;
     struct sockaddr_in addr;
     char ipStr[INET6_ADDRSTRLEN];
-    int32_t miliSecWaitingOnResoponse;//-1 if not waiting
-    uint32_t uniqueID;//stored in host byte order
+
+    //Time spent waiting on a PAIR_ACCEPT_MSGTYPE or PAIR_DECLINE_MSGTYPE.
+    //The purpose of keeping track of this is to time people out from sending
+    //more than 1 PAIR_REQUEST_MSGTYPE every PAIR_REQUEST_TIMEOUT_SECS seconds.
+    //If this variable holds -1 the user is not waiting on a response. If the
+    //variable is hoilding a positive number then that number is how many milliseconds
+    //they have been waiting.
+    int32_t miliSecWaitingOnResoponse;
+
+    //Everyone connected and in the lobby has a unique identifier (0 - RAND_MAX).
+    //In the future this identifier will be used as a key in some type 
+    //of associative data structure, like a hash table.
+    uint32_t uniqueID;
+
 }LobbyConnection;
 
 //the size of the stack used by the lobby manager thread in bytes

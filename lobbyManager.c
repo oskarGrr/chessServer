@@ -90,6 +90,8 @@ static void connectionInfoCtor(LobbyConnection* const newConn,
     char newIDMessage[NEW_ID_MSG_SIZE] = {NEW_ID_MSGTYPE};
     uint32_t nwByteOrder_ID = (uint32_t)htonl(newID);
     memcpy(newIDMessage + 1, &nwByteOrder_ID, sizeof(nwByteOrder_ID));
+
+    printf("sending a NEW_ID_MSGTYPE to %s (ID: %u)\n", newConn->ipStr, newConn->uniqueID);
     send(sock, newIDMessage, sizeof(newIDMessage), 0);
 }
 
@@ -169,7 +171,7 @@ static void sendLobbyMembersToGameManager(LobbyConnection* client1,
 }
 
 //Handles the PAIR_ACCEPT_MSGTYPE message type (defined in chessAppLevelProtocol.h).
-static void handlePairAccept(const char* msg, LobbyConnection* client, size_t* currentRange)
+static void handlePairAcceptMessage(const char* msg, LobbyConnection* client, size_t* currentRange)
 {
     uint32_t networkByteOrderUniqueID = 0;
 
@@ -192,7 +194,7 @@ static void handlePairAccept(const char* msg, LobbyConnection* client, size_t* c
 }
 
 //Handles the PAIR_REQUEST_MSGTYPE message type (defined in chessAppLevelProtocol.h)
-static void handlePairRequest(const char* msg, LobbyConnection* client)
+static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
 {
     //This number comes in as network byte order, and stays as network byte order.
     //This is because uniqueIdentifier will be re-sent immediately to the client
@@ -237,6 +239,27 @@ static void handlePairRequest(const char* msg, LobbyConnection* client)
     }
 }
 
+static void handlePairDeclineMessage(const char* msg, LobbyConnection* client)
+{
+    uint32_t networkByteOrderID = 0;
+    memcpy(&networkByteOrderID, msg + 1, sizeof(networkByteOrderID));
+
+    LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderID));
+    if(!potentialOpponent)//If the player to send the PAIR_DECLINE_MSGTYPE to is not in the lobby.
+    {
+        printf("sending a ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
+        char idNotInLobbyMsg[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        send(client->socket, idNotInLobbyMsg, sizeof(idNotInLobbyMsg), 0);
+    }
+    else//If the player to send the PAIR_DECLINE_MSGTYPE to is in the lobby.
+    {
+        printf("sending a PAIR_DECLINE_MSGTYPE to %s\n", potentialOpponent->ipStr);
+        char pairDeclineMsg[PAIR_DECLINE_MSG_SIZE] = {PAIR_DECLINE_MSGTYPE};
+        uint32_t nwByteOrderClientID = htonl(client->uniqueID);
+        memcpy(pairDeclineMsg + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
+    }
+}
+
 //close connection and return false if msg size doesnt match the type
 static bool confirmMsgSize(size_t msgSize, size_t correctSize, LobbyConnection* client)
 {
@@ -257,17 +280,28 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     {
     case PAIR_REQUEST_MSGTYPE:
     {
-        if(!confirmMsgSize(size, PAIR_REQUEST_MSG_SIZE, client)) return false;
+        if(!confirmMsgSize(size, PAIR_REQUEST_MSG_SIZE, client)) {return false;}
+
         printf("recieved a PAIR_REQUEST_MSGTYPE from %s\n", client->ipStr);
-        handlePairRequest(msg, client); break;
+        handlePairRequestMessage(msg, client);
+        break;
     }
     case PAIR_ACCEPT_MSGTYPE:
     {
-        if(!confirmMsgSize(size, PAIR_ACCEPT_MSG_SIZE, client)) return false;
+        if(!confirmMsgSize(size, PAIR_ACCEPT_MSG_SIZE, client)) {return false;}
+
         printf("revieced a PAIR_ACCEPT_MSGTYPE from %s\n", client->ipStr);
-        handlePairAccept(msg, client, currentRange); break;
+        handlePairAcceptMessage(msg, client, currentRange); 
+        break;
     }
-    case PAIR_DECLINE_MSGTYPE: break;//TODO make timer for pair requests
+    case PAIR_DECLINE_MSGTYPE:
+    {
+        if(!confirmMsgSize(size, PAIR_DECLINE_MSG_SIZE, client)) {return false;}
+
+        printf("recieved a PAIR_DECLINE_MSGTYPE from %s\n", client->ipStr);
+        handlePairDeclineMessage(msg, client, currentRange);
+        break;
+    }
     default:
     {
         logError("invalid message type sent from client... uh oh", 0);
@@ -278,8 +312,8 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     return true;
 }
 
-//if the lobby member has sent a PAIR_REQUEST_MSGTYPE and is waiting PAIR_REQUEST_TIMEOUT_SECS
-//for either a PAIR_DECLINE_MSGTYPE or a PAIR_ACCEPT_MSGTYPE then add time to their personal timer
+//If the lobby member has sent a PAIR_REQUEST_MSGTYPE, and is waiting PAIR_REQUEST_TIMEOUT_SECS
+//for either a PAIR_DECLINE_MSGTYPE, or a PAIR_ACCEPT_MSGTYPE, then add time to their personal timer.
 static void addTimeIfNecessary(LobbyConnection* lobbyConn, const struct timespec* deltaTime)
 {
     //miliSecWaitingOnRequestResoponse will be -1 if they are not waiting
@@ -287,7 +321,7 @@ static void addTimeIfNecessary(LobbyConnection* lobbyConn, const struct timespec
         return;
 
     lobbyConn->miliSecWaitingOnResoponse += deltaTime->tv_sec * 1000;
-    lobbyConn->miliSecWaitingOnResoponse += deltaTime->tv_nsec / 1000000;
+    lobbyConn->miliSecWaitingOnResoponse += deltaTime->tv_nsec / 1'000'000;
 }
 
 static void checkForTimeout(LobbyConnection* lobbyConn)
