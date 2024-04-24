@@ -257,6 +257,7 @@ static void handlePairDeclineMessage(const char* msg, LobbyConnection* client)
         char pairDeclineMsg[PAIR_DECLINE_MSG_SIZE] = {PAIR_DECLINE_MSGTYPE};
         uint32_t nwByteOrderClientID = htonl(client->uniqueID);
         memcpy(pairDeclineMsg + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
+        send(potentialOpponent->socket, pairDeclineMsg, sizeof(pairDeclineMsg), 0);
     }
 }
 
