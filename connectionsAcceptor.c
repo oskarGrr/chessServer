@@ -11,7 +11,7 @@
 
 #include "errorLogger.h"
 #include "lobbyManager.h"
-#include "chessAppLevelProtocol.h"
+#include "chessNetworkProtocol.h"
 
 #define RECV_MESSAGE_BUFSIZE 256
 #define PORT 42069
@@ -100,7 +100,7 @@ static void acceptNewConnections(SOCKET listenSocket)
 
         if(getAvailableLobbyRoom() == 0)
         {
-            char buff[SERVER_FULL_MSG_SIZE] = {SERVER_FULL_MSGTYPE};
+            char buff[SERVER_FULL_MSGSIZE] = {SERVER_FULL_MSGTYPE};
             send(socketFd, buff, sizeof(buff), 0);
             closesocket(socketFd);
         }

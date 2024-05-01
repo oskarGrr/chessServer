@@ -6,7 +6,7 @@
 #include <process.h>
 
 #include "lobbyManager.h"
-#include "chessAppLevelProtocol.h"
+#include "chessNetworkProtocol.h"
 #include "errorLogger.h"
 
 extern CRITICAL_SECTION   g_lobbyMutex;
@@ -67,7 +67,7 @@ static const char* recvMessage(ChessPlayer* from, ChessPlayer* to, char* msgBuff
     if(recvRet == 0)
     {
         char msgTypeStr[] = STRINGIFY(OPPONENT_CLOSED_CONNECTION_MSGTPYE);
-        char buff[OPPONENT_CLOSED_CONNECTION_MSG_SIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTPYE};
+        char buff[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTYPE};
         send(to->sock, buff, sizeof(buff), 0);
         printf("connection from %s closed. Sending %s to %s\n", from->ipStr, msgTypeStr, to->ipStr);
         closesocket(from->sock);
@@ -89,25 +89,25 @@ static void handleMessage(const char* msg, ChessPlayer* from, ChessPlayer* to)
 {
     switch(msg[0])
     {
-    case UNPAIR_MSGTPYE: {forwardMessage(msg, UNPAIR_MSG_SIZE, STRINGIFY(UNPAIR_MSGTPYE), from, to); break;}
-    case MOVE_MSGTYPE: {forwardMessage(msg, MOVE_MSG_SIZE, STRINGIFY(MOVE_MSGTYPE), from, to); break;}
-    case RESIGN_MSGTYPE: {forwardMessage(msg, RESIGN_MSG_SIZE, STRINGIFY(RESIGN_MSGTYPE), from, to); break;}
-    case REMATCH_REQUEST_MSGTYPE: {forwardMessage(msg, REMATCH_REQUEST_MSG_SIZE, STRINGIFY(REMATCH_REQUEST_MSGTYPE), from, to); break;}
-    case REMATCH_ACCEPT_MSGTYPE: {forwardMessage(msg, REMATCH_ACCEPT_MSG_SIZE, STRINGIFY(REMATCH_ACCEPT_MSGTYPE), from, to); break;}
-    case REMATCH_DECLINE_MSGTYPE: {forwardMessage(msg, REMATCH_DECLINE_MSG_SIZE, STRINGIFY(REMATCH_DECLINE_MSGTYPE), from, to); break;}
-    case DRAW_ACCEPT_MSGTYPE: {forwardMessage(msg, DRAW_ACCEPT_MSG_SIZE, STRINGIFY(DRAW_ACCEPT_MSG_SIZE), from, to); break;}
-    case DRAW_OFFER_MSGTYPE: {forwardMessage(msg, DRAW_OFFER_MSG_SIZE, STRINGIFY(DRAW_OFFER_MSGTYPE), from, to); break;}
-    case DRAW_DECLINE_MSGTYPE: {forwardMessage(msg, DRAW_DECLINE_MSG_SIZE, STRINGIFY(DRAW_DECLINE_MSGTYPE), from, to); break;}
+    case UNPAIR_MSGTYPE: {forwardMessage(msg, UNPAIR_MSGSIZE, STRINGIFY(UNPAIR_MSGTPYE), from, to); break;}
+    case MOVE_MSGTYPE: {forwardMessage(msg, MOVE_MSGSIZE, STRINGIFY(MOVE_MSGTYPE), from, to); break;}
+    case RESIGN_MSGTYPE: {forwardMessage(msg, RESIGN_MSGSIZE, STRINGIFY(RESIGN_MSGTYPE), from, to); break;}
+    case REMATCH_REQUEST_MSGTYPE: {forwardMessage(msg, REMATCH_REQUEST_MSGSIZE, STRINGIFY(REMATCH_REQUEST_MSGTYPE), from, to); break;}
+    case REMATCH_ACCEPT_MSGTYPE: {forwardMessage(msg, REMATCH_ACCEPT_MSGSIZE, STRINGIFY(REMATCH_ACCEPT_MSGTYPE), from, to); break;}
+    case REMATCH_DECLINE_MSGTYPE: {forwardMessage(msg, REMATCH_DECLINE_MSGSIZE, STRINGIFY(REMATCH_DECLINE_MSGTYPE), from, to); break;}
+    case DRAW_ACCEPT_MSGTYPE: {forwardMessage(msg, DRAW_ACCEPT_MSGSIZE, STRINGIFY(DRAW_ACCEPT_MSG_SIZE), from, to); break;}
+    case DRAW_OFFER_MSGTYPE: {forwardMessage(msg, DRAW_OFFER_MSGSIZE, STRINGIFY(DRAW_OFFER_MSGTYPE), from, to); break;}
+    case DRAW_DECLINE_MSGTYPE: {forwardMessage(msg, DRAW_DECLINE_MSGSIZE, STRINGIFY(DRAW_DECLINE_MSGTYPE), from, to); break;}
     default: {handleInvalidMessageType(from, to);}
     }
 
-    if(msg[0] == UNPAIR_MSGTPYE || msg[0] == REMATCH_DECLINE_MSGTYPE)
+    if(msg[0] == UNPAIR_MSGTYPE || msg[0] == REMATCH_DECLINE_MSGTYPE)
         putPlayersBackAndEndThread(from, to);
 }
 
 static void sendPairingCompleteMsg(ChessPlayer* p1, ChessPlayer* p2)
 {
-    char buff[PAIRING_COMPLETE_MSG_SIZE] = {PAIRING_COMPLETE_MSGTYPE};
+    char buff[PAIR_COMPLETE_MSGSIZE] = {PAIRING_COMPLETE_MSGTYPE};
     char whiteOrBlackPieces = (rand() & 1) ? (char)WHITE : (char)BLACK;
 
     p1->side = whiteOrBlackPieces;

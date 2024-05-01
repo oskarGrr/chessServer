@@ -14,7 +14,7 @@
 
 #include "gameManager.h"
 #include "lobbyManager.h"
-#include "chessAppLevelProtocol.h"
+#include "chessNetworkProtocol.h"
 #include "errorLogger.h"
 
 //this C file is responsible for the "lobby" thread. the lobby is like a waiting room where
@@ -87,7 +87,7 @@ static void connectionInfoCtor(LobbyConnection* const newConn,
     newConn->uniqueID = newID;
 
     //send the randomly generated ID to the client so they can use it effectively as a "friend code"
-    char newIDMessage[NEW_ID_MSG_SIZE] = {NEW_ID_MSGTYPE};
+    char newIDMessage[NEW_ID_MSGSIZE] = {NEW_ID_MSGTYPE};
     uint32_t nwByteOrder_ID = (uint32_t)htonl(newID);
     memcpy(newIDMessage + 1, &nwByteOrder_ID, sizeof(nwByteOrder_ID));
 
@@ -183,7 +183,7 @@ static void handlePairAcceptMessage(const char* msg, LobbyConnection* client, si
     LobbyConnection* opponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
     if(!opponent)//if the person who originally sent PAIR_REQUEST_MSGTYPE is no longer in the lobby
     {
-        char buff[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
     }
@@ -210,7 +210,7 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     //the client from making another request before their timer resets
     if(client->miliSecWaitingOnResoponse > -1)
     {
-        char buff[PAIR_REQUEST_TOO_SOON_MSG_SIZE] = {PAIR_REQUEST_TOO_SOON_MSGTYPE};
+        char buff[PAIR_REQUEST_TOO_SOON_MSGSIZE] = {PAIR_REQUEST_TOO_SOON_MSGTYPE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending PAIR_REQUEST_TOO_SOON_MSGTYPE to %s", client->ipStr);
         return;
@@ -219,14 +219,14 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
     if(!potentialOpponent || potentialOpponent == client)
     {
-        char buff[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending ID_NOT_IN_LOBBY_MSGTYPE tp %s\n", client->ipStr);
     }
     else
     {
         uint32_t nwByteOrderClientID = htonl(client->uniqueID);
-        char buff[PAIR_REQUEST_MSG_SIZE] = {PAIR_REQUEST_MSGTYPE};
+        char buff[PAIR_REQUEST_MSGSIZE] = {PAIR_REQUEST_MSGTYPE};
         memcpy(buff + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
 
         send(potentialOpponent->socket, buff, sizeof(buff), 0);
@@ -248,13 +248,13 @@ static void handlePairDeclineMessage(const char* msg, LobbyConnection* client)
     if(!potentialOpponent)//If the player to send the PAIR_DECLINE_MSGTYPE to is not in the lobby.
     {
         printf("sending a ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
-        char idNotInLobbyMsg[ID_NOT_IN_LOBBY_MSG_SIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char idNotInLobbyMsg[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
         send(client->socket, idNotInLobbyMsg, sizeof(idNotInLobbyMsg), 0);
     }
     else//If the player to send the PAIR_DECLINE_MSGTYPE to is in the lobby.
     {
         printf("sending a PAIR_DECLINE_MSGTYPE to %s\n", potentialOpponent->ipStr);
-        char pairDeclineMsg[PAIR_DECLINE_MSG_SIZE] = {PAIR_DECLINE_MSGTYPE};
+        char pairDeclineMsg[PAIR_DECLINE_MSGSIZE] = {PAIR_DECLINE_MSGTYPE};
         uint32_t nwByteOrderClientID = htonl(client->uniqueID);
         memcpy(pairDeclineMsg + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
         send(potentialOpponent->socket, pairDeclineMsg, sizeof(pairDeclineMsg), 0);
@@ -281,7 +281,7 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     {
     case PAIR_REQUEST_MSGTYPE:
     {
-        if(!confirmMsgSize(size, PAIR_REQUEST_MSG_SIZE, client)) {return false;}
+        if(!confirmMsgSize(size, PAIR_REQUEST_MSGSIZE, client)) {return false;}
 
         printf("recieved a PAIR_REQUEST_MSGTYPE from %s\n", client->ipStr);
         handlePairRequestMessage(msg, client);
@@ -289,7 +289,7 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     }
     case PAIR_ACCEPT_MSGTYPE:
     {
-        if(!confirmMsgSize(size, PAIR_ACCEPT_MSG_SIZE, client)) {return false;}
+        if(!confirmMsgSize(size, PAIR_ACCEPT_MSGSIZE, client)) {return false;}
 
         printf("revieced a PAIR_ACCEPT_MSGTYPE from %s\n", client->ipStr);
         handlePairAcceptMessage(msg, client, currentRange); 
@@ -297,7 +297,7 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
     }
     case PAIR_DECLINE_MSGTYPE:
     {
-        if(!confirmMsgSize(size, PAIR_DECLINE_MSG_SIZE, client)) {return false;}
+        if(!confirmMsgSize(size, PAIR_DECLINE_MSGSIZE, client)) {return false;}
 
         printf("recieved a PAIR_DECLINE_MSGTYPE from %s\n", client->ipStr);
         handlePairDeclineMessage(msg, client, currentRange);
@@ -330,7 +330,7 @@ static void checkForTimeout(LobbyConnection* lobbyConn)
     if(lobbyConn->miliSecWaitingOnResoponse < PAIR_REQUEST_TIMEOUT_SECS)
         return;
 
-    char buff[PAIR_NORESPONSE_MSG_SIZE] = {PAIR_NORESPONSE_MSGTYPE};
+    char buff[PAIR_NORESPONSE_MSGSIZE] = {PAIR_NORESPONSE_MSGTYPE};
     send(lobbyConn->socket, buff, sizeof(buff), 0);
     printf("sending PAIR_NORESPONSE_MSGTYPE to %s\n", lobbyConn->ipStr);
 
