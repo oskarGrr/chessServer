@@ -67,8 +67,10 @@ static const char* recvMessage(ChessPlayer* from, ChessPlayer* to, char* msgBuff
     if(recvRet == 0)
     {
         char msgTypeStr[] = STRINGIFY(OPPONENT_CLOSED_CONNECTION_MSGTPYE);
-        char buff[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTYPE, 
-            OPPONENT_CLOSED_CONNECTION_MSGSIZE};
+        char buff[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {
+            OPPONENT_CLOSED_CONNECTION_MSGTYPE, 
+            OPPONENT_CLOSED_CONNECTION_MSGSIZE
+        };
         send(to->sock, buff, sizeof(buff), 0);
         printf("connection from %s closed. Sending %s to %s\n", from->ipStr, msgTypeStr, to->ipStr);
         closesocket(from->sock);
@@ -82,6 +84,14 @@ static void handleInvalidMessageType(ChessPlayer* from, ChessPlayer* to)
     char errMsgBuff[256] = {0};
     sprintf_s(errMsgBuff, sizeof(errMsgBuff), formatStr, from->ipStr, to->ipStr);
     logError(errMsgBuff, 0);
+
+    char connectionClosedMsg[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {
+        OPPONENT_CLOSED_CONNECTION_MSGTYPE,
+        OPPONENT_CLOSED_CONNECTION_MSGSIZE
+    };
+    send(to->sock, connectionClosedMsg, sizeof(connectionClosedMsg), 0);
+    printf("sending a OPPONENT_CLOSED_CONNECTION_MSGTYPE to %s\n", to->ipStr);
+
     closesocket(from->sock);
     putPlayersBackAndEndThread(NULL, to);
 }
