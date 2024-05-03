@@ -55,7 +55,7 @@ static void forwardMessage(const char* msg, size_t msgSize, const char* msgType,
 
 static const char* recvMessage(ChessPlayer* from, ChessPlayer* to, char* msgBuff, size_t buffSize)
 {
-    int recvRet = recv(from->sock, msgBuff, sizeof(buffSize), 0);
+    const int recvRet = recv(from->sock, msgBuff, sizeof(buffSize), 0);
     if(recvRet == SOCKET_ERROR)
     {
         char errMsg[256] = {0};
@@ -67,7 +67,8 @@ static const char* recvMessage(ChessPlayer* from, ChessPlayer* to, char* msgBuff
     if(recvRet == 0)
     {
         char msgTypeStr[] = STRINGIFY(OPPONENT_CLOSED_CONNECTION_MSGTPYE);
-        char buff[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTYPE};
+        char buff[OPPONENT_CLOSED_CONNECTION_MSGSIZE] = {OPPONENT_CLOSED_CONNECTION_MSGTYPE, 
+            OPPONENT_CLOSED_CONNECTION_MSGSIZE};
         send(to->sock, buff, sizeof(buff), 0);
         printf("connection from %s closed. Sending %s to %s\n", from->ipStr, msgTypeStr, to->ipStr);
         closesocket(from->sock);
@@ -89,13 +90,13 @@ static void handleMessage(const char* msg, ChessPlayer* from, ChessPlayer* to)
 {
     switch(msg[0])
     {
-    case UNPAIR_MSGTYPE: {forwardMessage(msg, UNPAIR_MSGSIZE, STRINGIFY(UNPAIR_MSGTPYE), from, to); break;}
+    case UNPAIR_MSGTYPE: {forwardMessage(msg, UNPAIR_MSGSIZE, STRINGIFY(UNPAIR_MSGTYPE), from, to); break;}
     case MOVE_MSGTYPE: {forwardMessage(msg, MOVE_MSGSIZE, STRINGIFY(MOVE_MSGTYPE), from, to); break;}
     case RESIGN_MSGTYPE: {forwardMessage(msg, RESIGN_MSGSIZE, STRINGIFY(RESIGN_MSGTYPE), from, to); break;}
     case REMATCH_REQUEST_MSGTYPE: {forwardMessage(msg, REMATCH_REQUEST_MSGSIZE, STRINGIFY(REMATCH_REQUEST_MSGTYPE), from, to); break;}
     case REMATCH_ACCEPT_MSGTYPE: {forwardMessage(msg, REMATCH_ACCEPT_MSGSIZE, STRINGIFY(REMATCH_ACCEPT_MSGTYPE), from, to); break;}
     case REMATCH_DECLINE_MSGTYPE: {forwardMessage(msg, REMATCH_DECLINE_MSGSIZE, STRINGIFY(REMATCH_DECLINE_MSGTYPE), from, to); break;}
-    case DRAW_ACCEPT_MSGTYPE: {forwardMessage(msg, DRAW_ACCEPT_MSGSIZE, STRINGIFY(DRAW_ACCEPT_MSG_SIZE), from, to); break;}
+    case DRAW_ACCEPT_MSGTYPE: {forwardMessage(msg, DRAW_ACCEPT_MSGSIZE, STRINGIFY(DRAW_ACCEPT_MSGSIZE), from, to); break;}
     case DRAW_OFFER_MSGTYPE: {forwardMessage(msg, DRAW_OFFER_MSGSIZE, STRINGIFY(DRAW_OFFER_MSGTYPE), from, to); break;}
     case DRAW_DECLINE_MSGTYPE: {forwardMessage(msg, DRAW_DECLINE_MSGSIZE, STRINGIFY(DRAW_DECLINE_MSGTYPE), from, to); break;}
     default: {handleInvalidMessageType(from, to);}
@@ -107,17 +108,17 @@ static void handleMessage(const char* msg, ChessPlayer* from, ChessPlayer* to)
 
 static void sendPairingCompleteMsg(ChessPlayer* p1, ChessPlayer* p2)
 {
-    char buff[PAIR_COMPLETE_MSGSIZE] = {PAIRING_COMPLETE_MSGTYPE};
+    char buff[PAIR_COMPLETE_MSGSIZE] = {PAIRING_COMPLETE_MSGTYPE, PAIR_COMPLETE_MSGSIZE};
     char whiteOrBlackPieces = (rand() & 1) ? (char)WHITE : (char)BLACK;
 
     p1->side = whiteOrBlackPieces;
-    memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
+    memcpy(buff + 2, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
     send(p1->sock, buff, sizeof(buff), 0);
 
     whiteOrBlackPieces = (whiteOrBlackPieces == WHITE) ? BLACK : WHITE;//swap sides
 
     p2->side = whiteOrBlackPieces;
-    memcpy(buff + 1, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
+    memcpy(buff + 2, &whiteOrBlackPieces, sizeof(whiteOrBlackPieces));
     send(p2->sock, buff, sizeof(buff), 0);
     printf("sending PAIRING_COMPLETE_MSG to %s and %s\n", p1->ipStr, p2->ipStr);
 }

@@ -41,7 +41,7 @@ CONDITION_VARIABLE g_lobbyEmptyCond;
 CONDITION_VARIABLE g_gameManagerIsReadyCond;
 extern bool g_gameConstructionInProgress;//bool for lobby to wait on with the above CV
 
-//get how much room is left in the lobby. 
+//get how much room is left in the lobby.
 size_t getAvailableLobbyRoom(void)
 {
     EnterCriticalSection(&g_lobbyMutex);
@@ -64,7 +64,7 @@ static void connectionInfoCtor(LobbyConnection* const newConn,
     const int sock, struct sockaddr_in* addr)
 {
     newConn->socket = sock;
-    newConn->miliSecWaitingOnResoponse = -1;//-1 indicates that the user isnt waiting on a reponse
+    newConn->miliSecWaitingOnResoponse = -1;//-1 indicates that the user is not waiting on a reponse
     memcpy(&newConn->addr, addr, sizeof(*addr));
     InetNtopA(addr->sin_family, &addr->sin_addr, newConn->ipStr, INET6_ADDRSTRLEN);
 
@@ -86,10 +86,10 @@ static void connectionInfoCtor(LobbyConnection* const newConn,
 
     newConn->uniqueID = newID;
 
-    //send the randomly generated ID to the client so they can use it effectively as a "friend code"
-    char newIDMessage[NEW_ID_MSGSIZE] = {NEW_ID_MSGTYPE};
+    //send the randomly generated ID to the client so they can use it like a "friend code"
+    char newIDMessage[NEW_ID_MSGSIZE] = {NEW_ID_MSGTYPE, NEW_ID_MSGSIZE};
     uint32_t nwByteOrder_ID = (uint32_t)htonl(newID);
-    memcpy(newIDMessage + 1, &nwByteOrder_ID, sizeof(nwByteOrder_ID));
+    memcpy(newIDMessage + 2, &nwByteOrder_ID, sizeof(nwByteOrder_ID));
 
     printf("sending a NEW_ID_MSGTYPE to %s (ID: %u)\n", newConn->ipStr, newConn->uniqueID);
     send(sock, newIDMessage, sizeof(newIDMessage), 0);
@@ -175,15 +175,15 @@ static void handlePairAcceptMessage(const char* msg, LobbyConnection* client, si
 {
     uint32_t networkByteOrderUniqueID = 0;
 
-    //The first byte of every message will be a 1 byte char that is the corresponding
-    //macro defined in chessAppLevelProtocol.h to signify what the following bytes represent.
-    //This is why the src in memcpy is msg + 1, since we are "stepping over" that 1 byte message header.
-    memcpy(&networkByteOrderUniqueID, msg + 1, sizeof(networkByteOrderUniqueID));
+    //The first byte of every message will be a 2 byte header.
+    //This is why the src param in memcpy is msg + 2.
+    //memcpy will "step over" that 2 byte message header.
+    memcpy(&networkByteOrderUniqueID, msg + 2, sizeof(networkByteOrderUniqueID));
 
     LobbyConnection* opponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
     if(!opponent)//if the person who originally sent PAIR_REQUEST_MSGTYPE is no longer in the lobby
     {
-        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE, ID_NOT_IN_LOBBY_MSGSIZE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
     }
@@ -204,13 +204,14 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     //The first byte of every message will be a 1 byte char that is the corresponding
     //macro defined in chessAppLevelProtocol.h to signify what the following bytes represent.
     //This is why the src in memcpy is msg + 1, since we are "stepping over" that 1 byte message header.
-    memcpy(&networkByteOrderUniqueID, msg + 1, sizeof(networkByteOrderUniqueID));
+    memcpy(&networkByteOrderUniqueID, msg + 2, sizeof(networkByteOrderUniqueID));
     
     //if already waiting on a response to a pair request message then stop
     //the client from making another request before their timer resets
     if(client->miliSecWaitingOnResoponse > -1)
     {
-        char buff[PAIR_REQUEST_TOO_SOON_MSGSIZE] = {PAIR_REQUEST_TOO_SOON_MSGTYPE};
+        char buff[PAIR_REQUEST_TOO_SOON_MSGSIZE] = {PAIR_REQUEST_TOO_SOON_MSGTYPE, 
+            PAIR_REQUEST_TOO_SOON_MSGSIZE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending PAIR_REQUEST_TOO_SOON_MSGTYPE to %s", client->ipStr);
         return;
@@ -219,15 +220,16 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
     if(!potentialOpponent || potentialOpponent == client)
     {
-        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE, 
+            ID_NOT_IN_LOBBY_MSGSIZE};
         send(client->socket, buff, sizeof(buff), 0);
         printf("sending ID_NOT_IN_LOBBY_MSGTYPE tp %s\n", client->ipStr);
     }
     else
     {
         uint32_t nwByteOrderClientID = htonl(client->uniqueID);
-        char buff[PAIR_REQUEST_MSGSIZE] = {PAIR_REQUEST_MSGTYPE};
-        memcpy(buff + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
+        char buff[PAIR_REQUEST_MSGSIZE] = {PAIR_REQUEST_MSGTYPE, PAIR_REQUEST_MSGSIZE};
+        memcpy(buff + 2, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
 
         send(potentialOpponent->socket, buff, sizeof(buff), 0);
         printf("sending PAIR_REQUEST_MSGTYPE to %s\n", potentialOpponent->ipStr);
@@ -242,21 +244,22 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
 static void handlePairDeclineMessage(const char* msg, LobbyConnection* client)
 {
     uint32_t networkByteOrderID = 0;
-    memcpy(&networkByteOrderID, msg + 1, sizeof(networkByteOrderID));
+    memcpy(&networkByteOrderID, msg + 2, sizeof(networkByteOrderID));
 
     LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderID));
     if(!potentialOpponent)//If the player to send the PAIR_DECLINE_MSGTYPE to is not in the lobby.
     {
         printf("sending a ID_NOT_IN_LOBBY_MSGTYPE to %s\n", client->ipStr);
-        char idNotInLobbyMsg[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE};
+        char idNotInLobbyMsg[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE,
+            ID_NOT_IN_LOBBY_MSGSIZE};
         send(client->socket, idNotInLobbyMsg, sizeof(idNotInLobbyMsg), 0);
     }
     else//If the player to send the PAIR_DECLINE_MSGTYPE to is in the lobby.
     {
         printf("sending a PAIR_DECLINE_MSGTYPE to %s\n", potentialOpponent->ipStr);
-        char pairDeclineMsg[PAIR_DECLINE_MSGSIZE] = {PAIR_DECLINE_MSGTYPE};
+        char pairDeclineMsg[PAIR_DECLINE_MSGSIZE] = {PAIR_DECLINE_MSGTYPE, PAIR_DECLINE_MSGSIZE};
         uint32_t nwByteOrderClientID = htonl(client->uniqueID);
-        memcpy(pairDeclineMsg + 1, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
+        memcpy(pairDeclineMsg + 2, &nwByteOrderClientID, sizeof(nwByteOrderClientID));
         send(potentialOpponent->socket, pairDeclineMsg, sizeof(pairDeclineMsg), 0);
     }
 }
@@ -330,7 +333,7 @@ static void checkForTimeout(LobbyConnection* lobbyConn)
     if(lobbyConn->miliSecWaitingOnResoponse < PAIR_REQUEST_TIMEOUT_SECS)
         return;
 
-    char buff[PAIR_NORESPONSE_MSGSIZE] = {PAIR_NORESPONSE_MSGTYPE};
+    char buff[PAIR_NORESPONSE_MSGSIZE] = {PAIR_NORESPONSE_MSGTYPE, PAIR_NORESPONSE_MSGSIZE};
     send(lobbyConn->socket, buff, sizeof(buff), 0);
     printf("sending PAIR_NORESPONSE_MSGTYPE to %s\n", lobbyConn->ipStr);
 

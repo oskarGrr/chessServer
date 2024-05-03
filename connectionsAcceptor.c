@@ -100,7 +100,7 @@ static void acceptNewConnections(SOCKET listenSocket)
 
         if(getAvailableLobbyRoom() == 0)
         {
-            char buff[SERVER_FULL_MSGSIZE] = {SERVER_FULL_MSGTYPE};
+            char buff[SERVER_FULL_MSGSIZE] = {SERVER_FULL_MSGTYPE, SERVER_FULL_MSGSIZE};
             send(socketFd, buff, sizeof(buff), 0);
             closesocket(socketFd);
         }
