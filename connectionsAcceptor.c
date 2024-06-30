@@ -39,7 +39,7 @@ static SOCKET createListenSocket(char const* ip, uint16_t port)
         }
         else if(ptonRet < 0)
         {
-            logError("inet_pton() failed when trying to make the listen socket", WSAGetLastError());
+            logError("inet_pton() failed", WSAGetLastError());
             exit(EXIT_FAILURE);
         }
     }

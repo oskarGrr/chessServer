@@ -93,11 +93,9 @@ MessageType
     //the ID is the ID of the person who sent the pair request to the server origonally.
     PAIR_REQUEST_MSGTYPE,
 
-    //When the opponent accepts a PAIR_REQUEST_MSGTYPE (client to server and server to client).
-    //The 4 bytes after the first two header bytes will be a network byte order uint32_t unique identifier.
-    //When this message is being sent from client to server, the ID will be the ID of the player
-    //who you want to send a pair accept message to. When this message is being sent from server to client,
-    //the ID will be the ID of the player who sent the pair accept message to the server origonally.
+    //Sent to the server from the client, when the client accepts a PAIR_REQUEST_MSGTYPE.
+    //The 4 bytes after the first two header bytes will be a network byte order uint32_t unique identifier
+    //of the person who orrigonally sent the PAIR_REQUEST_MSGTYPE.
     PAIR_ACCEPT_MSGTYPE,
 
     //When the opponent declines a request to be paired up.
