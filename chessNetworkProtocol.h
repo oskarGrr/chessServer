@@ -20,7 +20,7 @@ Side
  : uint8_t
 #endif
 {
-    INVALID, WHITE, BLACK
+    INVALID = -1, WHITE, BLACK
 }Side;
 
 //This MessageType enum (1 byte) will be the first byte of every message.
@@ -36,7 +36,7 @@ MessageType
 #endif
 {
     //(client to server and server to client)
-    //The layout of the MOVE_MSGTYPE type of message:
+    //The layout of the MOVE_MSGTYPE type of message (class ChessMove defined in move.h client code):
     //|0|1|2|3|4|5|6|7|
     //Byte 0 will be MessageType::MOVE_MSGTYPE.
     //Byte 1 will be MessageSize::MOVE_MSGSIZE.
@@ -45,12 +45,12 @@ MessageType
     //Byte 3 will be the rank (0-7) of the square where the piece is moving from.
     //Byte 4 will be the file (0-7) of the square where the piece is moving to.
     //Byte 5 will be the rank (0-7) of the square where the piece is moving to.
-    //Byte 6 will be the PromoType (enum defined in (client source)moveInfo.h) of the promotion if there is one.
-    //Byte 7 will be the MoveInfo (enum defined in (client source)moveInfo.h) of the move that is happening.
+    //Byte 6 will be the ChessMove::PromoTypes (enum defined in (client source)moveInfo.h) of the promotion if there was one.
+    //Byte 7 will be the ChessMove::MoveTypes (enum defined in (client source)moveInfo.h) of the move that is happening.
     //
-    //The reason why enum PromoType and enum MoveInfo only defined in the client source is
-    //because they are only used as that type there. Those bytes are not cast to/de-serialized to
-    //their enum types on the server. This message is simply forwarded along from one player to the other in a chess game.
+    //The reason why enum ChessMove::PromoTypes and enum ChessMove::MoveTypes are only defined in the client source is
+    //because they are only used as that type there (in the client source). Those bytes are not cast to/de-serialized to
+    //their enum types on the server. This message is simply forwarded along from one player/client to the other durring a chess game.
     MOVE_MSGTYPE,
 
     //(client to server and server to client)
@@ -117,6 +117,7 @@ MessageType
 
     //Sent (from server to client only) when a player tries to supply an ID
     //of another player which is not in the lobby (or they supply their own ID).
+    //The invalid ID is sent back to the client in this message.
     ID_NOT_IN_LOBBY_MSGTYPE,
 
     //Sent (from server to client and client to server)
@@ -170,7 +171,7 @@ MessageSize
     PAIR_COMPLETE_MSGSIZE = 3,
     PAIR_NORESPONSE_MSGSIZE = 2,
     SERVER_FULL_MSGSIZE = 2,
-    ID_NOT_IN_LOBBY_MSGSIZE = 2,
+    ID_NOT_IN_LOBBY_MSGSIZE = 6,
     UNPAIR_MSGSIZE = 2,
     OPPONENT_CLOSED_CONNECTION_MSGSIZE = 2,
     REMATCH_DECLINE_MSGSIZE = 2,
