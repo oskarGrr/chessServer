@@ -303,7 +303,7 @@ static bool handleIncommingLobbyMsg(const char* msg, size_t size,
         if(!confirmMsgSize(size, PAIR_DECLINE_MSGSIZE, client)) {return false;}
 
         printf("recieved a PAIR_DECLINE_MSGTYPE from %s\n", client->ipStr);
-        handlePairDeclineMessage(msg, client, currentRange);
+        handlePairDeclineMessage(msg, client);
         break;
     }
     default:

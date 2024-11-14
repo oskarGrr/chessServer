@@ -20,7 +20,7 @@ Side
  : uint8_t
 #endif
 {
-    INVALID = -1, WHITE, BLACK
+    INVALID = 0, WHITE, BLACK
 }Side;
 
 //This MessageType enum (1 byte) will be the first byte of every message.
@@ -37,16 +37,20 @@ MessageType
 {
     //(client to server and server to client)
     //The layout of the MOVE_MSGTYPE type of message (class ChessMove defined in move.h client code):
-    //|0|1|2|3|4|5|6|7|
-    //Byte 0 will be MessageType::MOVE_MSGTYPE.
-    //Byte 1 will be MessageSize::MOVE_MSGSIZE.
-    //--------------------------------------------------------------------------------------
-    //Byte 2 will be the file (0-7) of the square where the piece is moving from.
-    //Byte 3 will be the rank (0-7) of the square where the piece is moving from.
-    //Byte 4 will be the file (0-7) of the square where the piece is moving to.
-    //Byte 5 will be the rank (0-7) of the square where the piece is moving to.
-    //Byte 6 will be the ChessMove::PromoTypes (enum defined in (client source)moveInfo.h) of the promotion if there was one.
-    //Byte 7 will be the ChessMove::MoveTypes (enum defined in (client source)moveInfo.h) of the move that is happening.
+    // |0|1|2|3|4|5|6|7|8|9|
+    //byte 0 will be the MOVE_MSGTYPE  <--- header bytes
+    //byte 1 will be the MOVE_MSGSIZE  <---
+    //
+    //byte 2 will be the file (0-7) the piece if moving from   <--- source square
+    //byte 3 will be the rank (0-7) the piece if moving from   <---
+    // 
+    //byte 4 will be the file (0-7) the piece if moving to   <--- destination square
+    //byte 5 will be the rank (0-7) the piece if moving to   <---
+    // 
+    //byte 6 will be the PromoType (enum defined in (client source)moveInfo.h) of the promotion if there is one
+    //byte 7 will be the MoveInfo (enum defined in (client source)moveInfo.h)
+    //byte 8 will be the ChessMove::rightsToRevoke as an unsigned char
+    //byte 9 will be the ChessMove::wasCapture bool
     //
     //The reason why enum ChessMove::PromoTypes and enum ChessMove::MoveTypes are only defined in the client source is
     //because they are only used as that type there (in the client source). Those bytes are not cast to/de-serialized to
@@ -158,7 +162,7 @@ MessageSize
  : uint8_t
 #endif
 {
-    MOVE_MSGSIZE = 8,
+    MOVE_MSGSIZE = 10,
     RESIGN_MSGSIZE = 2,
     DRAW_OFFER_MSGSIZE = 2,
     DRAW_ACCEPT_MSGSIZE = 2,
