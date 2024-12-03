@@ -136,6 +136,7 @@
     <ClCompile Include="gameManager.c" />
     <ClCompile Include="lobbyManager.c" />
     <ClCompile Include="main.c" />
+    <ClCompile Include="networkWrite.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="chessNetworkProtocol.h" />
@@ -143,6 +144,7 @@
     <ClInclude Include="errorLogger.h" />
     <ClInclude Include="gameManager.h" />
     <ClInclude Include="lobbyManager.h" />
+    <ClInclude Include="networkWrite.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

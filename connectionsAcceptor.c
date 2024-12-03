@@ -121,7 +121,7 @@ static void acceptNewConnections(SOCKET listenSocket)
 //there is only meant to be 1 thread spawned from this
 void __stdcall acceptConnectionsThreadStart(void* ptr)
 {
-    srand(time(NULL));
+    srand((unsigned)time(NULL));
     SOCKET listenSocket = createListenSocket(NULL, PORT);
     acceptNewConnections(listenSocket);
 }
