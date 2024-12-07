@@ -208,6 +208,7 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     if( ! potentialOpponent || potentialOpponent == client )
     {
         char buff[ID_NOT_IN_LOBBY_MSGSIZE] = {ID_NOT_IN_LOBBY_MSGTYPE, ID_NOT_IN_LOBBY_MSGSIZE};
+        memcpy(buff + 2, &networkByteOrderUniqueID, sizeof(networkByteOrderUniqueID));
         networkSendAll(client->socket, buff, sizeof buff);
         printf("sending ID_NOT_IN_LOBBY_MSGTYPE tp %s\n", client->ipStr);
     }
