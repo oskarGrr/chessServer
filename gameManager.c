@@ -25,6 +25,13 @@ typedef struct
     char ipStr[INET6_ADDRSTRLEN];
 }Player;
 
+//helper func to reduce quitGame's size
+static void sendUnpairMessage(Player* p)
+{
+    char buff[2] = {UNPAIR_MSGTYPE, UNPAIR_MSGSIZE};
+    networkSendAll(p->sock, buff, sizeof buff);
+}
+
 //put the players back in the lobby and end this thread
 static void quitGame(Player* p1, Player* p2)
 {
@@ -32,11 +39,13 @@ static void quitGame(Player* p1, Player* p2)
 
     if(p1)
     {
+        sendUnpairMessage(p1);
         lobbyInsert(p1->sock, &p1->addr);
         printf("putting %s back in the lobby\n", p1->ipStr);
     }
     if(p2)
     {
+        sendUnpairMessage(p2);
         lobbyInsert(p2->sock, &p2->addr);
         printf("putting %s back in the lobby\n", p2->ipStr);
     }
@@ -87,9 +96,6 @@ static void handleInvalidMessageType(Player* from, Player* to)
 //helper func to reduce consumeMessage size
 static void handleUnpairMessage(const char* msgBuff, Player* from, Player* to)
 {
-    //send the same unpair message back to both players
-    networkSendAll(from->sock, msgBuff, UNPAIR_MSGSIZE);
-    networkSendAll(to->sock, msgBuff, UNPAIR_MSGSIZE);
     quitGame(from, to);
 }
 
