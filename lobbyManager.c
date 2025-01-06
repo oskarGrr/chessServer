@@ -199,9 +199,9 @@ static void handlePairRequestMessage(const char* msg, LobbyConnection* client)
     //of the person that client(the client param) anyway.
     uint32_t networkByteOrderUniqueID = 0;
 
-    //The first byte of every message will be a 1 byte char that is the corresponding
+    //The first byte of every message will be 2 bytes that is the corresponding
     //macro defined in chessAppLevelProtocol.h to signify what the following bytes represent.
-    //This is why the src in memcpy is msg + 1, since we are "stepping over" that 1 byte message header.
+    //This is why the src in memcpy is msg + 2, since we are "stepping over" that 1 byte message header.
     memcpy(&networkByteOrderUniqueID, msg + 2, sizeof(networkByteOrderUniqueID));
 
     LobbyConnection* potentialOpponent = getClientByUniqueID(ntohl(networkByteOrderUniqueID));
