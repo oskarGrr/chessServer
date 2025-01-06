@@ -1,3 +1,9 @@
-This is the multithreaded C TCP socket server for my C++ chess client app.
-At the moment the client is not up to date with the server. I am working on that
-currently so that the server and client are in sync :D.
+# Multithreaded chess server made in C and using the winsock API
+
+## overview
+This is the chess server that goes with the [chess desktop application that I made in C++](https://github.com/oskarGrr/MultiplayerChess). 
+
+
+## build inscructions
+For now the server only works on windows so I have just included a visual studio project.
+It should be as simple as oppening the .sln and pressing F5.
